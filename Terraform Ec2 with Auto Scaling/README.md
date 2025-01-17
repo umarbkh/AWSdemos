@@ -58,4 +58,5 @@ This demo Terraform configuration sets up an auto-scaling infrastructure on AWS.
 - Adjust the Auto Scaling Group's `min_size`, `max_size`, and `desired_capacity` to suit your requirements.
 - Review security group ingress rules to match your specific access needs.
 - in the browser make sure to access with http and not https, SSL is not part of this demo.
+- Make sure to run 'terraform destroy' to remove all resources.
 
