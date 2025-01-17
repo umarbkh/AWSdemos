@@ -55,3 +55,4 @@ Ansible is also used to install a webserver and confige Cloud watch agent to pus
 - Update security group rules to match your access requirements.
 - Verify SSM setup by testing the connection through the AWS Management Console or CLI.
 - Replace https with http in the browser, SSL is not part of this demo.
+- Make sure to run 'terraform destroy' to remove all resources.
