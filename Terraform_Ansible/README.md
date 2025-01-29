@@ -52,6 +52,7 @@ Ansible is also used to install a webserver and confige Cloud watch agent to pus
 
 ## Notes
 
+- Ansible playbook is in an S3 bucket, if the link is down, you maybe have to use your own link.
 - Update security group rules to match your access requirements.
 - Verify SSM setup by testing the connection through the AWS Management Console or CLI.
 - Replace https with http in the browser, SSL is not part of this demo.

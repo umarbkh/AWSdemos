@@ -1,0 +1,117 @@
+---
+- name: Install Prometheus on Amazon Linux
+  hosts: all
+  become: yes
+  vars:
+    prometheus_version: "2.43.0"
+    prometheus_tarball_url: "https://github.com/prometheus/prometheus/releases/download/v{{ prometheus_version }}/prometheus-{{ prometheus_version }}.linux-amd64.tar.gz"
+    prometheus_bin_dir: "/usr/local/bin"
+    prometheus_config_dir: "/etc/prometheus"
+    prometheus_data_dir: "/var/lib/prometheus"
+    prometheus_service_file: "/etc/systemd/system/prometheus.service"
+
+  tasks:
+    - name: Update system packages
+      yum:
+        name: "*"
+        state: latest
+
+    - name: Install required dependencies
+      yum:
+        name:
+          - wget
+          - tar
+        state: present
+
+    - name: Download Prometheus tarball
+      get_url:
+        url: "{{ prometheus_tarball_url }}"
+        dest: "/tmp/prometheus-{{ prometheus_version }}.linux-amd64.tar.gz"
+        mode: '0644'
+
+    - name: Extract Prometheus tarball
+      unarchive:
+        src: "/tmp/prometheus-{{ prometheus_version }}.linux-amd64.tar.gz"
+        dest: "/tmp"
+        remote_src: yes
+
+    - name: Move Prometheus binaries to system directory
+      copy:
+        src: "/tmp/prometheus-{{ prometheus_version }}.linux-amd64/prometheus"
+        dest: "{{ prometheus_bin_dir }}/prometheus"
+        mode: '0755'
+      notify:
+        - Move promtool binary
+
+    - name: Move promtool binary to system directory
+      copy:
+        src: "/tmp/prometheus-{{ prometheus_version }}.linux-amd64/promtool"
+        dest: "{{ prometheus_bin_dir }}/promtool"
+        mode: '0755'
+
+    - name: Create Prometheus user
+      user:
+        name: prometheus
+        shell: /bin/false
+        state: present
+        create_home: no
+
+    - name: Create Prometheus config and data directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: prometheus
+        group: prometheus
+        mode: '0755'
+      with_items:
+        - "{{ prometheus_config_dir }}"
+        - "{{ prometheus_data_dir }}"
+
+    - name: Copy Prometheus configuration file
+      copy:
+        src: "/tmp/prometheus-{{ prometheus_version }}.linux-amd64/prometheus.yml"
+        dest: "{{ prometheus_config_dir }}/prometheus.yml"
+        owner: prometheus
+        group: prometheus
+        mode: '0644'
+
+    - name: Create Prometheus systemd service file
+      copy:
+        content: |
+          [Unit]
+          Description=Prometheus
+          Documentation=https://prometheus.io/docs/introduction/overview/
+          After=network.target
+
+          [Service]
+          User=prometheus
+          Group=prometheus
+          ExecStart={{ prometheus_bin_dir }}/prometheus \
+            --config.file={{ prometheus_config_dir }}/prometheus.yml \
+            --storage.tsdb.path={{ prometheus_data_dir }}/ \
+            --web.console.templates={{ prometheus_config_dir }}/consoles \
+            --web.console.libraries={{ prometheus_config_dir }}/console_libraries
+          Restart=always
+
+          [Install]
+          WantedBy=multi-user.target
+        dest: "{{ prometheus_service_file }}"
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Reload systemd
+      systemd:
+        daemon_reload: yes
+
+    - name: Enable and start Prometheus service
+      systemd:
+        name: prometheus
+        enabled: yes
+        state: started
+
+    - name: Clean up the downloaded tarball
+      file:
+        path: "/tmp/prometheus-{{ prometheus_version }}.linux-amd64.tar.gz"
+        state: absent
+s
