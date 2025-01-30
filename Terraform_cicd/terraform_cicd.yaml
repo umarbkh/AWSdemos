@@ -1,0 +1,82 @@
+---
+- name: Setup Web Server and Jenkins
+  hosts: localhost
+  become: true
+  tasks:
+
+    - name: Install required packages
+      yum:
+        name:
+          - httpd
+          - php
+          - java-11-openjdk  # Needed for Jenkins
+          - git
+        state: present
+
+    - name: Start and enable Apache
+      systemd:
+        name: httpd
+        enabled: yes
+        state: started
+
+    - name: Add Jenkins repo
+      get_url:
+        url: https://pkg.jenkins.io/redhat-stable/jenkins.repo
+        dest: /etc/yum.repos.d/jenkins.repo
+
+    - name: Import Jenkins key
+      rpm_key:
+        key: https://pkg.jenkins.io/redhat-stable/jenkins.io.key
+        state: present
+
+    - name: Install Jenkins
+      yum:
+        name: jenkins
+        state: present
+
+    - name: Start and enable Jenkins
+      systemd:
+        name: jenkins
+        enabled: yes
+        state: started
+
+    - name: Allow Jenkins in firewall
+      firewalld:
+        service: jenkins
+        permanent: yes
+        state: enabled
+      notify: Restart Firewalld
+
+    - name: Clone specific folder (webapp_cicd) using sparse checkout
+      git:
+        repo: 'https://github.com/umarbkh/AWSdemos.git'
+        dest: '/var/www/html/webapp_cicd'
+        version: 'main'  # You can specify a branch or commit here
+        sparse_checkout: true
+        config:
+          core.sparseCheckout: true
+
+    - name: Set sparse-checkout to only include webapp_cicd folder
+      command: |
+        cd /var/www/html/webapp_cicd
+        git sparse-checkout set webapp_cicd
+
+    - name: Set permissions for webapp folder
+      file:
+        path: /var/www/html/webapp_cicd
+        owner: apache
+        group: apache
+        mode: '0755'
+        recurse: yes
+
+    - name: Create a symlink for the index.php to /var/www/html
+      file:
+        src: /var/www/html/webapp_cicd/index.php
+        dest: /var/www/html/index.php
+        state: link
+
+  handlers:
+    - name: Restart Firewalld
+      systemd:
+        name: firewalld
+        state: restarted
